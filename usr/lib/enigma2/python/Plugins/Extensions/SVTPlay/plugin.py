@@ -80,7 +80,7 @@ MODE_VIEW_CLIPS = "view_clips"
 MODE_PLAYLIST_MANAGER = "playlist-manager"
 MODE_FAVORITES = "favorites"
 
-VERSION = "0.0.1"
+VERSION = "0.0.2"
 
 def SVTMenuEntryComponent(name, description, long_description = None, pngname="default", info = None, width=540):
 	#print "SVTMenuEntryComponent :", name, description, long_description, pngname, width
@@ -100,7 +100,7 @@ def SVTMenuEntryComponent(name, description, long_description = None, pngname="d
 		return [
 			(_(name), description, long_description, info),
 			MultiContentEntryText(pos=(100, 0), size=(width-60, 40), font=0, text = _(name)),
-			MultiContentEntryPixmapAlphaBlend(pos=(10, 0), size=(90, 90), png = png),
+			MultiContentEntryPixmapAlphaBlend(pos=(10, 5), size=(90, 90), png = png),
 		]
 	else:
 		return [
@@ -155,21 +155,29 @@ class SVTPlayMainMenu(Screen):
 	
 	def __init__(self, session):
 		Screen.__init__(self, session)
-		PluginVersion = _("SVTPlay - Version: %s") % (VERSION)
-		Screen.setTitle(self, PluginVersion)
+		Screen.setTitle(self, "SVTPlay")
 		
 		self.oldUrl = ""
 		self.oldUrl2 = ""
 		self.categoriesUrl = []
 		
+		self.can_exit = False
+		
 		self["coverArt"] = Cover(self.coverLoaded)
 		self["duration"] = Label()
 		self["aired"] = Label()
 		self["plot"] = Label()
+		
+		self["categoryTitle"] = Label()
+		self["categoryTitle"].setText(_("Main Menu"))
 
 		msg = ((_('Loading')) + '...')
 		self['loadingText'] = Label(msg)
 		self['loadingPixmap'] = MultiPixmap()
+		
+		self['loadingPixmap'].hide()
+		self['loadingText'].hide()
+		
 		self.activityTimer = eTimer()
 		self.activityTimer.timeout.get().append(self.updateLoadingPixmap)
 		
@@ -237,7 +245,6 @@ class SVTPlayMainMenu(Screen):
 
 	def coverDownloadFailed(self, result):
 		print '[SVTPlay] cover download failed: %s ' % result
-		#self['coverArt'].updateIcon('/usr/lib/enigma2/python/Plugins/Extensions/SVTPlay/icons/fanart.png')
 
 	def selectionChanged(self):
 		print "[SVTPlay] selectionChanged()"
@@ -296,20 +303,28 @@ class SVTPlayMainMenu(Screen):
 
         def KeyBlue(self):
 		print '[SVTPlay] KeyBlue'
-		self.session.open(MessageBox, _('SVT Play plugin for Enigma2.\nPlugin base on KODI plugin.\n\nSupport on: http://miracleforum.net\n\nGIT: https://github.com/miraclebox-git/SVTPlay-Enigma2'), MessageBox.TYPE_INFO)
+		about_text = _('SVT Play - Version: %s\n\nPlugin for Enigma2 based on KODI addon.\n\nSupport on:\nhttp://miracleforum.net\n\nGIT:\nhttps://github.com/miraclebox-git/SVTPlay-Enigma2') % (VERSION)
+		self.session.open(MessageBox, about_text, MessageBox.TYPE_INFO)
 
         def KeyExit(self):
 		print '[SVTPlay] KeyExit, last menu : ', self.oldUrl, self.oldUrl2
+		
+		if self.can_exit:
+			self.close()
 			
 		if self.oldUrl == "":
+			self.can_exit = False
 			self.close()
 		elif self.oldUrl == MODE_CATEGORIES:
 			self.mainList()
+			self.can_exit = True
 		elif self.oldUrl == MODE_CATEGORY:
 			if self.oldUrl2 not in self.categoriesUrl:
 				self.viewCategories()
+				self.can_exit = False
 			else:
 				self.mainList()
+				self.can_exit = True
 		elif self.oldUrl == MODE_PROGRAM:
 			try:
 				self.viewProgramsForCategories(self.oldUrl2)
@@ -317,34 +332,45 @@ class SVTPlayMainMenu(Screen):
 			except:
 					self.mainList()
 		elif self.oldUrl == MODE_CLIPS:
+			self.can_exit = False
 			self.viewClips(self.oldUrl2)
 		elif self.oldUrl == MODE_A_TO_O:
 			self.mainList()
+			self.can_exit = True
 		elif self.oldUrl in (MODE_POPULAR, MODE_LATEST, MODE_LAST_CHANCE, MODE_LIVE_PROGRAMS):
 			self.mainList()
+			self.can_exit = True
 		elif self.oldUrl == MODE_LATEST_NEWS:
 			self.mainList()
+			self.can_exit = True
 		elif self.oldUrl == MODE_CHANNELS:
 			self.mainList()
+			self.can_exit = True
 		elif self.oldUrl == MODE_LETTER:
 			self.mainList()
+			self.can_exit = True
 		elif self.oldUrl == MODE_SEARCH:
 			self.mainList()
+			self.can_exit = True
 		elif self.oldUrl == MODE_BESTOF_CATEGORIES:
 			self.mainList()
+			self.can_exit = True
 		elif self.oldUrl == MODE_BESTOF_CATEGORY:
+			self.can_exit = False
 			self.viewBestOfCategories()
 			self.oldUrl = MODE_BESTOF_CATEGORIES
 		else:
+			self.can_exit = False
 			self.close()
 		    
 
 	def KeyOk(self):
 		self.sel = self["list"].getCurrent()
-		'''print "[SVTPlay] KeyOK : ", self.sel
+		print "[SVTPlay] KeyOK : ", self.sel
 		print "[SVTPlay] KeyOK : ", self.sel[0]
 		print "[SVTPlay] KeyOK : ", self.sel[0][0]
-		print "[SVTPlay] KeyOK : ", self.sel[0][1]'''
+		self["categoryTitle"].setText(self.sel[0][0])
+		print "[SVTPlay] KeyOK : ", self.sel[0][1]
 		
 		try:
 			ARG_URL = self.sel[0][1]["url"]
@@ -438,6 +464,9 @@ class SVTPlayMainMenu(Screen):
 		self.clearList()
 		for episode in episodes:
 			self.createDirItem(episode, MODE_VIDEO)
+			
+		# Hack for SelectionChanged
+		self.updateList()
 
 	def viewLatestNews(self):
 		items = svt.getLatestNews()
@@ -447,6 +476,9 @@ class SVTPlayMainMenu(Screen):
 		self.clearList()    
 		for item in items:
 			self.createDirItem(item, MODE_VIDEO)
+			
+		# Hack for SelectionChanged
+		self.updateList()
 
 	def viewChannels(self):
 		channels = svt.getChannels()
@@ -456,6 +488,9 @@ class SVTPlayMainMenu(Screen):
 		self.clearList()
 		for channel in channels:
 			self.createDirItem(channel, MODE_VIDEO)
+		
+		# Hack for SelectionChanged
+		self.updateList()
 
 	def viewProgramsByLetter(self, letter):
 		programs = svt.getProgramsByLetter(letter)
@@ -520,6 +555,9 @@ class SVTPlayMainMenu(Screen):
 		self.clearList()
 		for clip in clips:
 			self.createDirItem(clip, MODE_VIDEO)
+			
+		# Hack for SelectionChanged
+		self.updateList()
 
 	def viewSection(self, section, page):
 		(items, moreItems) = svt.getItems(section, page)
@@ -532,6 +570,9 @@ class SVTPlayMainMenu(Screen):
 			self.addNextPageItem(page+1, section)
 			if page > 1:
 				self.addPrevPageItem(page-1, section)
+				
+		# Hack for SelectionChanged
+		self.updateList()
 
 	def viewSearch(self):
 		from Screens.VirtualKeyBoard import VirtualKeyBoard
@@ -559,6 +600,9 @@ class SVTPlayMainMenu(Screen):
 			if result["type"] == "program":
 				mode = MODE_PROGRAM
 			self.createDirItem(result["item"], mode)
+			
+		#Hack for SelectionChanged
+		self.updateList()
     
 	def playVideo(self, url, title):
 		if not url.startswith("/"):
@@ -592,6 +636,8 @@ class SVTPlayMainMenu(Screen):
 		self["list"].l.setList(self.list)
 
 	def mainList(self):
+		self["categoryTitle"].setText(_("Main Menu"))
+		
 		self.list = []
 		self.addDirectoryItem("Popular", { "mode": MODE_POPULAR })
 		self.addDirectoryItem("Latest programs", { "mode": MODE_LATEST })
@@ -624,11 +670,15 @@ class SVTPlayMainMenu(Screen):
 		Given an article and a mode; create directory item
 		for the article.
 		"""
-		if (article["title"].lower().endswith("teckentolkad") == False and article["title"].lower().find("teckenspråk".decode("utf-8")) == -1):
-			params = {}
-			params["mode"] = mode
-			params["url"] = article["url"]
-			folder = False
+		params = {}
+		params["mode"] = mode
+		params["url"] = article["url"]
+		folder = False
+		#if (article["title"].lower().endswith("teckentolkad") == False and article["title"].lower().find("teckenspråk".decode("utf-8")) == -1):
+			#params = {}
+			#params["mode"] = mode
+			#params["url"] = article["url"]
+			#folder = False
 
 		if mode == MODE_PROGRAM:
 			folder = True
@@ -637,7 +687,7 @@ class SVTPlayMainMenu(Screen):
 			info = article["info"]
 		self.addDirectoryItem(str(article["title"]), params, str(article["thumbnail"]), folder, False, info)
 		# Hack for SelectionChanged
-		self.updateList()
+		#self.updateList()
     
 	def addDirectoryItem(self, title, params, thumbnail = None, folder = True, live = False, info = None):
 		'''print "[SVTPlay] Title : ", title

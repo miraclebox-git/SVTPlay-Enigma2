@@ -252,7 +252,6 @@ class SVTPlayMainMenu(Screen):
 
 	def selectionChanged(self):
 		print "[SVTPlay] selectionChanged()"
-		self.downloadCover()
 		
 		info = self["list"].getCurrent()[0][3]
 		print "[SVTPlay] selectionChanged : ", info
@@ -281,7 +280,10 @@ class SVTPlayMainMenu(Screen):
 			self["plot"].setText("")
 			self["aired"].setText("")
 
+		self.downloadCover()
+		
 	def downloadCover(self):
+		#self['coverArt'].updateIcon('/usr/lib/enigma2/python/Plugins/Extensions/SVTPlay/icons/fanart.png')
 		downloadPage(str(self["list"].getCurrent()[0][2]), '/tmp/.cover').addCallback(self.coverDownloadFinished).addErrback(self.coverDownloadFailed)
 		
 	def hideCover(self):
@@ -292,7 +294,6 @@ class SVTPlayMainMenu(Screen):
 	def coverDownloadFinished(self, result):
 		print '[SVTPlay] cover download finished'
 		self['coverArt'].updateIcon('/tmp/.cover')
-		self['coverArt'].show()
         
 	def coverLoaded(self):
 		print '[SVTPlay] cover loaded'
@@ -682,7 +683,7 @@ class SVTPlayMainMenu(Screen):
 			info = article["info"]
 		self.addDirectoryItem(str(article["title"]), params, str(article["thumbnail"]), folder, False, info)
 		# Hack for SelectionChanged
-		#self.updateList()
+		self.updateList()
     
 	def addDirectoryItem(self, title, params, thumbnail = None, folder = True, live = False, info = None):
 		'''print "[SVTPlay] Title : ", title

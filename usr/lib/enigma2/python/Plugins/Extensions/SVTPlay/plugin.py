@@ -92,20 +92,24 @@ def SVTMenuEntryComponent(name, description, long_description = None, pngname="d
 		width = 640
 		icons = "icons"
 		
-	png = LoadPixmap("/usr/lib/enigma2/python/Plugins/Extensions/SVTPlay/" + icons + "/" + pngname + ".png")
+	png = LoadPixmap("/usr/lib/enigma2/python/Plugins/Extensions/SVTPlay/" + icons + "/" + pngname + ".png") 
 	if png is None: 
 		png = LoadPixmap("/usr/lib/enigma2/python/Plugins/Extensions/SVTPlay/" + icons + "/CategoryItem.png")
 
 	if screenwidth and screenwidth == 1920:
 		return [
 			(_(name), description, long_description, info),
-			MultiContentEntryText(pos=(100, 0), size=(width-60, 40), font=0, text = _(name)),
+			#MultiContentEntryText(pos=(100, 0), size=(width-60, 40), font=0, text = _(name)),
+			#MultiContentEntryPixmapAlphaBlend(pos=(10, 5), size=(90, 90), png = png),
+			MultiContentEntryText(pos=(20, 0), size=(width-60, 40), font=0, text = _(name)),
 			MultiContentEntryPixmapAlphaBlend(pos=(10, 5), size=(0, 0), png = png),
 		]
 	else:
 		return [
 			(_(name), description, long_description, info),
-			MultiContentEntryText(pos=(60, 0), size=(width-60, 30), font=0, text = _(name)),
+			#MultiContentEntryText(pos=(60, 0), size=(width-60, 30), font=0, text = _(name)),
+			#MultiContentEntryPixmapAlphaBlend(pos=(5, 0), size=(30, 30), png = png),
+			MultiContentEntryText(pos=(10, 0), size=(width-60, 30), font=0, text = _(name)),
 			MultiContentEntryPixmapAlphaBlend(pos=(5, 0), size=(0, 0), png = png),
 		]
 	
@@ -115,7 +119,7 @@ class SVTMenuList(MenuList):
 		screenwidth = getDesktop(0).size().width()
 		if screenwidth and screenwidth == 1920:
 			self.l.setFont(0, gFont("Regular", 32))
-			self.l.setItemHeight(80)
+			self.l.setItemHeight(80)  
 		else:
 			self.l.setFont(0, gFont("Regular", 22))
 			self.l.setItemHeight(30)
@@ -288,6 +292,7 @@ class SVTPlayMainMenu(Screen):
 	def coverDownloadFinished(self, result):
 		print '[SVTPlay] cover download finished'
 		self['coverArt'].updateIcon('/tmp/.cover')
+		self['coverArt'].show()
         
 	def coverLoaded(self):
 		print '[SVTPlay] cover loaded'
@@ -696,7 +701,7 @@ class SVTPlayMainMenu(Screen):
 		data = params
 
 		self.list.append(SVTMenuEntryComponent(title, data, thumbnail, png, info))
-
+		
 	def addClipDirItem(self, url):
 		"""
 		Adds the "Clips" directory item to a program listing.

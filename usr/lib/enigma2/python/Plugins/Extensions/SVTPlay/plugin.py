@@ -80,7 +80,7 @@ MODE_VIEW_CLIPS = "view_clips"
 MODE_PLAYLIST_MANAGER = "playlist-manager"
 MODE_FAVORITES = "favorites"
 
-VERSION = "0.0.2"
+VERSION = "0.0.3"
 
 def SVTMenuEntryComponent(name, description, long_description = None, pngname="default", info = None, width=540):
 	#print "SVTMenuEntryComponent :", name, description, long_description, pngname, width
@@ -161,7 +161,7 @@ class SVTPlayMainMenu(Screen):
 		self.oldUrl2 = ""
 		self.categoriesUrl = []
 		
-		self.can_exit = False
+		self.can_exit = 0
 		
 		self["coverArt"] = Cover(self.coverLoaded)
 		self["duration"] = Label()
@@ -308,23 +308,21 @@ class SVTPlayMainMenu(Screen):
 
         def KeyExit(self):
 		print '[SVTPlay] KeyExit, last menu : ', self.oldUrl, self.oldUrl2
-		
-		if self.can_exit:
+
+		if self.can_exit == 0:
 			self.close()
+		else:
+			self.can_exit = self.can_exit - 1
 			
 		if self.oldUrl == "":
-			self.can_exit = False
 			self.close()
 		elif self.oldUrl == MODE_CATEGORIES:
 			self.mainList()
-			self.can_exit = True
 		elif self.oldUrl == MODE_CATEGORY:
 			if self.oldUrl2 not in self.categoriesUrl:
 				self.viewCategories()
-				self.can_exit = False
 			else:
 				self.mainList()
-				self.can_exit = True
 		elif self.oldUrl == MODE_PROGRAM:
 			try:
 				self.viewProgramsForCategories(self.oldUrl2)
@@ -332,39 +330,31 @@ class SVTPlayMainMenu(Screen):
 			except:
 					self.mainList()
 		elif self.oldUrl == MODE_CLIPS:
-			self.can_exit = False
 			self.viewClips(self.oldUrl2)
 		elif self.oldUrl == MODE_A_TO_O:
 			self.mainList()
-			self.can_exit = True
 		elif self.oldUrl in (MODE_POPULAR, MODE_LATEST, MODE_LAST_CHANCE, MODE_LIVE_PROGRAMS):
 			self.mainList()
-			self.can_exit = True
 		elif self.oldUrl == MODE_LATEST_NEWS:
 			self.mainList()
-			self.can_exit = True
 		elif self.oldUrl == MODE_CHANNELS:
 			self.mainList()
-			self.can_exit = True
 		elif self.oldUrl == MODE_LETTER:
 			self.mainList()
-			self.can_exit = True
 		elif self.oldUrl == MODE_SEARCH:
 			self.mainList()
-			self.can_exit = True
 		elif self.oldUrl == MODE_BESTOF_CATEGORIES:
 			self.mainList()
-			self.can_exit = True
 		elif self.oldUrl == MODE_BESTOF_CATEGORY:
-			self.can_exit = False
 			self.viewBestOfCategories()
 			self.oldUrl = MODE_BESTOF_CATEGORIES
 		else:
-			self.can_exit = False
 			self.close()
 		    
 
 	def KeyOk(self):
+		self.can_exit = self.can_exit + 1
+		
 		self.sel = self["list"].getCurrent()
 		print "[SVTPlay] KeyOK : ", self.sel
 		print "[SVTPlay] KeyOK : ", self.sel[0]

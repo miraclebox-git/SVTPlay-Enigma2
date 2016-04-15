@@ -59,7 +59,6 @@ import json
 import sys
 import time
 import urllib
-import zipfile
 
 MODE_CHANNELS = "kanaler"
 MODE_A_TO_O = "a-o"
@@ -163,10 +162,16 @@ class SVTPlayMainMenu(Screen):
 		Screen.__init__(self, session)
 		Screen.setTitle(self, "SVTPlay")
 		
-		update_notification = UpdateNotification()
-		update_notification.setSession(self.session)
-		update_notification.UpdateSVTPlayer()
-		
+		if config.svtplay.checkUpdateOnStartUp.value:
+			update_notification = UpdateNotification()
+			update_notification.setSession(self.session)
+			update_notification.UpdateSVTPlayer()
+	
+		if config.svtplay.stopTv.value:
+			self.session.nav.stopService()
+
+		self.oldref = self.session.nav.getCurrentlyPlayingServiceReference()
+
 		self.oldUrl = ""
 		self.oldUrl2 = ""
 		self.categoriesUrl = []
@@ -322,7 +327,9 @@ class SVTPlayMainMenu(Screen):
 		print '[SVTPlay] KeyExit, last menu : ', self.oldUrl, self.oldUrl2
 
 		if self.can_exit == 0:
-			self.close()
+			if config.svtplay.stopTv.value:
+				self.session.nav.playService(self.oldref)
+				self.close()
 		else:
 			self.can_exit = self.can_exit - 1
 			
@@ -361,7 +368,9 @@ class SVTPlayMainMenu(Screen):
 			self.viewBestOfCategories()
 			self.oldUrl = MODE_BESTOF_CATEGORIES
 		else:
-			self.close()
+			if config.svtplay.stopTv.value:
+				self.session.nav.playService(self.oldref)
+				self.close()
 		    
 
 	def KeyOk(self):
@@ -595,7 +604,6 @@ class SVTPlayMainMenu(Screen):
 		helper.infoMsg("Search string: " + keyword)
 
 		keyword = re.sub(r" ", "+", keyword)
-
 
 		results = svt.getSearchResults(keyword)
 		for result in results:

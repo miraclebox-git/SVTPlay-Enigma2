@@ -36,6 +36,7 @@ config.svtplay.showOnMainMenu = ConfigYesNo(default=True)
 config.svtplay.showOnExtensions = ConfigYesNo(default=False)
 config.svtplay.showOnPluginList = ConfigYesNo(default=False)
 config.svtplay.stopTv = ConfigYesNo(default=False)
+config.svtplay.checkUpdateOnStartUp = ConfigYesNo(default=True)
 
 class SVTPlaySetup(Screen, ConfigListScreen):
 	def __init__(self, session):
@@ -63,6 +64,7 @@ class SVTPlaySetup(Screen, ConfigListScreen):
 		self.list.append(getConfigListEntry(_("Show plugin on main menu"), config.svtplay.showOnMainMenu))
 		self.list.append(getConfigListEntry(_("Show plugin on extensions list"), config.svtplay.showOnExtensions))
 		self.list.append(getConfigListEntry(_("Show plugin on plugin list"), config.svtplay.showOnPluginList))
+		self.list.append(getConfigListEntry(_("Check SVTPlay updates on startup"), config.svtplay.checkUpdateOnStartUp))
 		self.list.append(getConfigListEntry(_("Stop TV when enter to plugin"), config.svtplay.stopTv))
 
 		self["config"].list = self.list

@@ -21,35 +21,37 @@
 #
 #############################################################################
 
-from enigma import getDesktop, ePicLoad, eTimer, eListboxPythonMultiContent, gFont, getDesktop
+from enigma import getDesktop, eTimer, eListboxPythonMultiContent, gFont
 
 from Screens.Screen import Screen
 from Screens.MessageBox import MessageBox
 
 from Components.ActionMap import ActionMap
 from Components.Label import Label
-from Components.ScrollLabel import ScrollLabel
 from Components.Pixmap import Pixmap, MultiPixmap
 from Components.Sources.List import List
 from Components.MenuList import MenuList
 from Components.MultiContent import MultiContentEntryText, MultiContentEntryPixmapAlphaBlend
 
 from Tools.LoadPixmap import LoadPixmap
-from Tools.Directories import fileExists, pathExists, resolveFilename, SCOPE_CURRENT_SKIN
+from Tools.Directories import fileExists
 
 from twisted.web.client import downloadPage
 
 from boxbranding import getMachineBrand
 
 # Own imports
+from tools import GetSVTPlayerVersion
+from update import update_notification
 from Cover import Cover
 from ExtPlayer import ExMoviePlayer
 from settings import *
+from update import UpdateNotification
+
 import helper
 import bestofsvt as bestof
 import svt as svt
 import CommonFunctions as common 
-
 
 #System Imports
 import re
@@ -57,6 +59,7 @@ import json
 import sys
 import time
 import urllib
+import zipfile
 
 MODE_CHANNELS = "kanaler"
 MODE_A_TO_O = "a-o"
@@ -80,7 +83,6 @@ MODE_VIEW_CLIPS = "view_clips"
 MODE_PLAYLIST_MANAGER = "playlist-manager"
 MODE_FAVORITES = "favorites"
 
-VERSION = "0.0.3"
 
 def SVTMenuEntryComponent(name, description, long_description = None, pngname="default", info = None, width=540):
 	#print "SVTMenuEntryComponent :", name, description, long_description, pngname, width
@@ -160,6 +162,10 @@ class SVTPlayMainMenu(Screen):
 	def __init__(self, session):
 		Screen.__init__(self, session)
 		Screen.setTitle(self, "SVTPlay")
+		
+		update_notification = UpdateNotification()
+		update_notification.setSession(self.session)
+		update_notification.UpdateSVTPlayer()
 		
 		self.oldUrl = ""
 		self.oldUrl2 = ""
@@ -309,7 +315,7 @@ class SVTPlayMainMenu(Screen):
 
         def KeyBlue(self):
 		print '[SVTPlay] KeyBlue'
-		about_text = _('SVT Play - Version: %s\n\nPlugin for Enigma2 based on KODI addon.\n\nSupport on:\nhttp://miracleforum.net\n\nGIT:\nhttps://github.com/miraclebox-git/SVTPlay-Enigma2') % (VERSION)
+		about_text = _('SVT Play - Version: %s\n\nPlugin for Enigma2 based on KODI addon.\n\nSupport on:\nhttp://miracleforum.net\n\nGIT:\nhttps://github.com/miraclebox-git/SVTPlay-Enigma2') % (GetSVTPlayerVersion())
 		self.session.open(MessageBox, about_text, MessageBox.TYPE_INFO)
 
         def KeyExit(self):
@@ -362,11 +368,12 @@ class SVTPlayMainMenu(Screen):
 		self.can_exit = self.can_exit + 1
 		
 		self.sel = self["list"].getCurrent()
-		print "[SVTPlay] KeyOK : ", self.sel
-		print "[SVTPlay] KeyOK : ", self.sel[0]
-		print "[SVTPlay] KeyOK : ", self.sel[0][0]
 		self["categoryTitle"].setText(self.sel[0][0])
-		print "[SVTPlay] KeyOK : ", self.sel[0][1]
+
+		#print "[SVTPlay] KeyOK : ", self.sel
+		#print "[SVTPlay] KeyOK : ", self.sel[0]
+		#print "[SVTPlay] KeyOK : ", self.sel[0][0]
+		#print "[SVTPlay] KeyOK : ", self.sel[0][1]
 		
 		try:
 			ARG_URL = self.sel[0][1]["url"]
@@ -724,15 +731,16 @@ def main(session, **kwargs):
 def menu(menuid, **kwargs):
 	if menuid == "mainmenu":
 		return [(_("SVT Play"), main, "svt_play", 1)]
-	return []  
-	      
+	return []
+
 from Plugins.Plugin import PluginDescriptor
 def Plugins(**kwargs):
 	screenwidth = getDesktop(0).size().width()
-	desc_mainmenu  = PluginDescriptor(name = "SVT Play", description = _('www.svtplay.se'), where = PluginDescriptor.WHERE_MENU, fnc = menu)
-	desc_plugin  = PluginDescriptor(name = "SVT Play", description=_('www.svtplay.se'), icon='plugin_iconhd.png', where=PluginDescriptor.WHERE_PLUGINMENU, fnc=main)
-	desc_pluginhd  = PluginDescriptor(name = "SVT Play", description=_('www.svtplay.se'), icon='plugin_icon.png', where=PluginDescriptor.WHERE_PLUGINMENU, fnc=main)
-	desc_extensions  = PluginDescriptor(name = "SVT Play", description=_('www.svtplay.se'), icon='plugin_icon.png', where=PluginDescriptor.WHERE_EXTENSIONSMENU, fnc=main)
+	desc_mainmenu = PluginDescriptor(name = "SVT Play", description = _('www.svtplay.se'), where = PluginDescriptor.WHERE_MENU, fnc = menu)
+	desc_plugin = PluginDescriptor(name = "SVT Play", description=_('www.svtplay.se'), icon='plugin_iconhd.png', where=PluginDescriptor.WHERE_PLUGINMENU, fnc=main)
+	desc_pluginhd = PluginDescriptor(name = "SVT Play", description=_('www.svtplay.se'), icon='plugin_icon.png', where=PluginDescriptor.WHERE_PLUGINMENU, fnc=main)
+	desc_extensions = PluginDescriptor(name = "SVT Play", description=_('www.svtplay.se'), icon='plugin_icon.png', where=PluginDescriptor.WHERE_EXTENSIONSMENU, fnc=main)
+
 	list = []
 	if config.svtplay.showOnMainMenu.value:
 		list.append(desc_mainmenu)

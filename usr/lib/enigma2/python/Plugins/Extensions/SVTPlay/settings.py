@@ -23,14 +23,13 @@
 
 from Components.ActionMap import ActionMap
 from Components.Label import Label
-
 from Components.config import *
 from Components.UsageConfig import *
 from Components.ConfigList import *
 
 from Screens.Screen import Screen
 
-from Tools.Directories import fileExists
+from update import UpdateNotification
 
 config.svtplay = ConfigSubsection()
 config.svtplay.showOnMainMenu = ConfigYesNo(default=True)
@@ -41,6 +40,7 @@ config.svtplay.stopTv = ConfigYesNo(default=False)
 class SVTPlaySetup(Screen, ConfigListScreen):
 	def __init__(self, session):
 		Screen.__init__(self, session)
+		self.session = session
 		self.skinName = ["Setup"]
 		Screen.setTitle(self, _("SVTPlay Setup"))
 		
@@ -50,9 +50,11 @@ class SVTPlaySetup(Screen, ConfigListScreen):
 			
 		self["key_red"] = Label(_("Exit"))
 		self["key_green"] = Label(_("Save"))
+		self["key_blue"] = Label(_("Update"))
 
 		self["actions"] = ActionMap(["WizardActions", "ColorActions"],
 		{
+			"blue": self.keyBlue,
 			"green": self.keySave,
 			"back": self.keyCancel,
 			"red": self.keyCancel,
@@ -66,6 +68,11 @@ class SVTPlaySetup(Screen, ConfigListScreen):
 		self["config"].list = self.list
 		self["config"].l.setList(self.list)
 
+	def keyBlue(self):
+		update_notification = UpdateNotification()
+		update_notification.setSession(self.session)
+		update_notification.UpdateSVTPlayer()
+		
 	def keyLeft(self):
 		ConfigListScreen.keyLeft(self)
 

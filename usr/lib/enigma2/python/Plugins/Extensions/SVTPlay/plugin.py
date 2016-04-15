@@ -265,7 +265,7 @@ class SVTPlayMainMenu(Screen):
 		print "[SVTPlay] selectionChanged()"
 		
 		info = self["list"].getCurrent()[0][3]
-		print "[SVTPlay] selectionChanged : ", info
+		#print "[SVTPlay] selectionChanged : ", info
 		
 		try:
 			duration = info["duration"]
@@ -445,6 +445,9 @@ class SVTPlayMainMenu(Screen):
 	
 	def viewCategories(self):
 		categories = svt.getCategories()
+		if not categories:
+			return
+      
 		self.categoriesUrl = []
 		self.clearList()
 		for category in categories:
@@ -506,7 +509,9 @@ class SVTPlayMainMenu(Screen):
 
 	def viewProgramsByLetter(self, letter):
 		programs = svt.getProgramsByLetter(letter)
-
+		if not programs:
+			return
+      
 		self.clearList()
 		for program in programs:
 			self.addDirectoryItem(str(program["title"]), { "mode": MODE_PROGRAM, "url": program["url"] })
@@ -519,6 +524,9 @@ class SVTPlayMainMenu(Screen):
 		categories from the bestofsvt page
 		"""
 		categories = bestof.getCategories()
+		if not categories:
+			return
+      
 		params = {}
 		params["mode"] = MODE_BESTOF_CATEGORY
 
@@ -536,6 +544,9 @@ class SVTPlayMainMenu(Screen):
 		for a category
 		"""
 		shows = bestof.getShows(url)
+		if not shows:
+			return
+
 		params = {}
 		params["mode"] = MODE_VIDEO
 
@@ -548,6 +559,8 @@ class SVTPlayMainMenu(Screen):
 
 	def viewAtoO(self):
 		programs = svt.getAtoO()
+		if not programs:
+			return
 
 		self.clearList()
 		for program in programs:
@@ -575,6 +588,7 @@ class SVTPlayMainMenu(Screen):
 		(items, moreItems) = svt.getItems(section, page)
 		if not items:
 			return
+      
 		self.clearList()
 		for item in items:
 			self.createDirItem(item, MODE_VIDEO)
@@ -616,28 +630,28 @@ class SVTPlayMainMenu(Screen):
 		self.updateList()
     
 	def playVideo(self, url, title):
-			if not url.startswith("/"):
-				url = "/" + url
+		if not url.startswith("/"):
+			url = "/" + url
 
-			url = svt.BASE_URL + url + svt.JSON_SUFFIX
+		url = svt.BASE_URL + url + svt.JSON_SUFFIX
 
-			try:
-				show_obj = helper.resolveShowURL(url)
+		try:
+			show_obj = helper.resolveShowURL(url)
 
-				if show_obj["videoUrl"]:
-					print "[SVTPlay] videoUrl : ", show_obj["videoUrl"].replace(":", "%3a")
+			if show_obj["videoUrl"]:
+				print "[SVTPlay] videoUrl : ", show_obj["videoUrl"].replace(":", "%3a")
 
-					from Screens.InfoBar import MoviePlayer
-					from enigma import eServiceReference
-					
-					url = "4097:1:0:1:0:0:0:0:0:0:http%3a//127.0.0.1%3a88/hlsvariant%3a//" +  str(show_obj["videoUrl"].replace(":", "%3a")) + ":" + title
-					print "[SVTPlay] videoUrl: ", url
-					fileRef = eServiceReference(url)
-					self.session.open(ExMoviePlayer, fileRef)
-				else:
-					self.session.open(MessageBox, _('Sorry, NO VIDEO url found !'), MessageBox.TYPE_ERROR)
-			except:
-				self.session.open(MessageBox, _('Sorry, VIDEO url found !'), MessageBox.TYPE_ERROR)
+				from Screens.InfoBar import MoviePlayer
+				from enigma import eServiceReference
+				
+				url = "4097:1:0:1:0:0:0:0:0:0:http%3a//127.0.0.1%3a88/hlsvariant%3a//" +  str(show_obj["videoUrl"].replace(":", "%3a")) + ":" + title
+				print "[SVTPlay] videoUrl: ", url
+				fileRef = eServiceReference(url)
+				self.session.open(ExMoviePlayer, fileRef)
+			else:
+				self.session.open(MessageBox, _('Sorry, NO VIDEO url found !'), MessageBox.TYPE_ERROR)
+		except:
+			self.session.open(MessageBox, _('Sorry, VIDEO url found !'), MessageBox.TYPE_ERROR)
 
 	def clearList(self):
 		self.list = []

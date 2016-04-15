@@ -608,30 +608,29 @@ class SVTPlayMainMenu(Screen):
 		self.updateList()
     
 	def playVideo(self, url, title):
-		if not url.startswith("/"):
-			url = "/" + url
+			if not url.startswith("/"):
+				url = "/" + url
 
-		url = svt.BASE_URL + url + svt.JSON_SUFFIX
+			url = svt.BASE_URL + url + svt.JSON_SUFFIX
 
-		try:
-			show_obj = helper.resolveShowURL(url)
+			try:
+				show_obj = helper.resolveShowURL(url)
 
-			if show_obj["videoUrl"]:
-				print "[SVTPlay] videoUrl : ", show_obj["videoUrl"].replace(":", "%3a")
+				if show_obj["videoUrl"]:
+					print "[SVTPlay] videoUrl : ", show_obj["videoUrl"].replace(":", "%3a")
 
-				from Screens.InfoBar import MoviePlayer
-				from enigma import eServiceReference
-				
-				url = "4097:1:0:1:0:0:0:0:0:0:http%3a//127.0.0.1%3a88/hlsvariant%3a//" +  str(show_obj["videoUrl"].replace(":", "%3a")) + ":" + title
-				print "[SVTPlay] videoUrl: ", url
-				fileRef = eServiceReference(url)
-				self.session.open(ExMoviePlayer, fileRef)
-			else:
-				self.session.open(MessageBox, _('Sorry, NO VIDEO url found !'), MessageBox.TYPE_ERROR)
-		except:
-			self.session.open(MessageBox, _('Sorry, VIDEO url found !'), MessageBox.TYPE_ERROR)
+					from Screens.InfoBar import MoviePlayer
+					from enigma import eServiceReference
+					
+					url = "4097:1:0:1:0:0:0:0:0:0:http%3a//127.0.0.1%3a88/hlsvariant%3a//" +  str(show_obj["videoUrl"].replace(":", "%3a")) + ":" + title
+					print "[SVTPlay] videoUrl: ", url
+					fileRef = eServiceReference(url)
+					self.session.open(ExMoviePlayer, fileRef)
+				else:
+					self.session.open(MessageBox, _('Sorry, NO VIDEO url found !'), MessageBox.TYPE_ERROR)
+			except:
+				self.session.open(MessageBox, _('Sorry, VIDEO url found !'), MessageBox.TYPE_ERROR)
 
-			
 	def clearList(self):
 		self.list = []
 

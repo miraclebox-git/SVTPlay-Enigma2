@@ -22,11 +22,15 @@
 #############################################################################
 
 from Screens.MessageBox import MessageBox
+from Tools.Directories import fileExists
 
 from twisted.web.client import downloadPage
 from tools import GetSVTPlayerVersion
 
 from enigma import eTimer
+
+import zipfile
+from os import system
 
 class UpdateNotification:
 	def setSession(self, session):
@@ -62,6 +66,7 @@ class UpdateNotification:
 		self.session.open(MessageBox, _("Can not download informations about new version!"), type = MessageBox.TYPE_ERROR, timeout=5 )
 
 	def upgradeDownloadStart(self):
+		self.session.open(MessageBox, _("Downloading new version..."), type = MessageBox.TYPE_INFO)
 		downloadPage("https://github.com/miraclebox-git/SVTPlay-Enigma2/archive/master.zip", '/tmp/svtplay.zip').addCallback(self.upgradeDownloadFinished).addErrback(self.upgradeDownloadFailed)
 
 	def upgradeDownloadFailed(self, result):
@@ -71,16 +76,18 @@ class UpdateNotification:
 	def upgradeDownloadFinished(self, result):
 		print '[SVTPlay] upgrade download finished'
 		try:
+			self.session.open(MessageBox, _("Installing new version..."), type = MessageBox.TYPE_INFO)
 			zf = zipfile.ZipFile(r"/tmp/svtplay.zip")
 			zf.extractall(r"/tmp/svtplay/")
-			os.system('cp -a /tmp/svtplay/SVTPlay-Enigma2-master/* /')
+			system('cp -a /tmp/svtplay/SVTPlay-Enigma2-master/* /')
 			print '[SVTPlay] upgraded finished'
 			self.session.openWithCallback(self.restartGUI, MessageBox, _("System restart after SVTPlay update to version[%s].\n\n") % self.version_txt, type = MessageBox.TYPE_INFO, timeout = 5 )
 		except:
 			self.session.open(MessageBox, _("Restart system failed. \nPlease restart STB manually."), type = MessageBox.TYPE_INFO, timeout = 5)
 
-	def restartGUI(self):
-		from enigma import quitMainloop
-		quitMainloop(3)
+	def restartGUI(self, ret):
+		if ret:
+			from enigma import quitMainloop
+			quitMainloop(3)
 			
 update_notification = UpdateNotification()

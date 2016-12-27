@@ -397,7 +397,7 @@ def getVideoExtension(video_url):
 
 
 def getSetting(setting):
-  return True if addon.getSetting(setting) == "true" else False
+  return True
 
 def errorMsg(msg):
   common.log("Error: "+msg)

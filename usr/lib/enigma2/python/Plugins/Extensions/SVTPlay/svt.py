@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import urllib
+import re
 import requests
 
 import helper
@@ -7,7 +8,6 @@ import CommonFunctions as common
 
 BASE_URL = "http://svtplay.se"
 API_URL = "/api/"
-JSON_URL = "/ajax/sok/forslag.json"
 
 URL_A_TO_O = "/program"
 URL_TO_SEARCH = "/sok?q="
@@ -24,59 +24,42 @@ SECTION_LATEST_CLIPS = "play_js-tabpanel-more-clips"
 SECTION_EPISODES = "play_js-tabpanel-more-episodes"
 SECTION_LIVE_PROGRAMS = "live-channels"
 
-# Using Python magic to create shortcut
-parseDOM = common.parseDOM 
-
 def getAtoO():
   """
-  Returns a list of all programs, sorted A-Z.
+  Returns a list of all items, sorted A-Z.
   """
-  r = requests.get(BASE_URL+JSON_URL)
+  r = requests.get(BASE_URL+API_URL+"all_titles")
   if r.status_code != 200:
-    common.log("Could not fetch forslag JSON!")
+    common.log("Could not fetch JSON!")
     return None
   
   items = []
-  programs = []
-  for json_item in r.json():
-    if json_item["isGenre"] != "genre":
-      programs.append(json_item)
 
-  programs = sorted(programs, key=lambda program: program["title"])
-
-  for program in programs:
+  for program in r.json():
     item = {}
-    item["title"] = common.replaceHTMLCodes(program["title"])
-    item["thumbnail"] = helper.prepareThumb(program.get("thumbnail", ""), baseUrl=BASE_URL)
-    item["url"] = program["url"].replace("/senaste","")
+    item["title"] = common.replaceHTMLCodes(program["programTitle"])
+    item["thumbnail"] = ""
+    item["url"] = program["contentUrl"]
     items.append(item)
 
-  return items
+  return sorted(items, key=lambda item: item["title"])
 
 def getCategories():
   """
   Returns a list of all categories.
   """
-  r = requests.get(BASE_URL+API_URL+"programs_page")
+  r = requests.get(BASE_URL+API_URL+"active_clusters")
   if r.status_code != 200:
     common.log("Could not fetch JSON!")
     return None
 
   categories = []
 
-  for item in r.json()["categories"]:
+  for cluster in r.json():
     category = {}
-    category["url"] = item["url"]
-
-    if category["url"].endswith("oppetarkiv") or category["url"].endswith("barn"):
-      # Skip the "Oppetarkiv" and "Barn" category
-      continue
-
-    if not category["url"].startswith("genre"):
-      category["url"] = "genre/" + category["url"]
-
-    category["title"] = item["name"]
-    category["thumbnail"] = item.get("posterImageUrl", "")
+    category["title"] = cluster["name"]
+    category["url"] = cluster["contentUrl"]
+    category["genre"] = cluster["slug"]
     categories.append(category)
 
   return categories
@@ -85,58 +68,47 @@ def getLatestNews():
   """
   Returns a list of latest news programs.
   """
-  html = getPage("/nyheter")
-
-  container = parseDOM(html, "section", attrs = { "class" : "[^\"']*play_category__latest-list[^\"']*" })
-  if not container:
-    helper.errorMsg("Could not find container!")
-    return None
-
-  articles = parseDOM(container, "article")
-  if not articles:
-    helper.errorMsg("Could not find articles!")
-    return None
-
-  titles = parseDOM(container, "article", ret = "data-title")
-  airtimes = parseDOM(container, "article", ret = "data-broadcasted")
-  durations = parseDOM(container, "article", ret = "data-length")
-  urls = parseDOM(container, "a", attrs = { "class" : "[^\"']*play_js-videolist-element-link[^\"']*"}, ret = "href")
-  thumbnails = parseDOM(container, "img", attrs = { "class" : "[^\"']*play_videolist-element__thumbnail-image[^\"']*"}, ret = "src")
-
-  items = []
-  for index, article in enumerate(articles):
-     item = {
-        "title" : common.replaceHTMLCodes(titles[index]),
-        "thumbnail" : helper.prepareThumb(thumbnails[index], baseUrl=BASE_URL),
-        "url" : urls[index]
-        }
-     items.append(item)
-
-  return items
-
-def getProgramsForCategory(url):
-  """
-  Returns a list of programs for a specific category.
-  """
-  if url.startswith("genre/"):
-    return getProgramsForGenre(url.split("/")[1])
-  else:
-    return None
-
-def getProgramsForGenre(genre):
-  url = BASE_URL+API_URL+"cluster_page;cluster="+genre
+  url = BASE_URL+API_URL+"cluster_latest;cluster=nyheter"
   r = requests.get(url)
   if r.status_code != 200:
     common.log("Could not get JSON for url: "+url)
     return None
 
   programs = []
-  for item in r.json()["contents"]:
+  for item in r.json():
+    live_str = ""
+    thumbnail = item.get("poster", "")
+    if not thumbnail:
+      thumbnail = item.get("thumbnail", "")
+    if item["broadcastedNow"]:
+      live_str = " " + "[COLOR red](Live)[/COLOR]"
+    program = {
+        "title" : common.replaceHTMLCodes(item["programTitle"] + " " + item["title"] + live_str),
+        "thumbnail" : helper.prepareThumb(thumbnail, baseUrl=BASE_URL),
+        "url" : "video/" + str(item["versions"][0]["articleId"])
+        }
+    programs.append(program)
+  return programs
+
+def getProgramsForGenre(genre):
+  """
+  Returns a list of all programs for a genre.
+  """
+  url = BASE_URL+API_URL+"cluster_titles_and_episodes/?cluster="+genre
+  r = requests.get(url)
+  if r.status_code != 200:
+    common.log("Could not get JSON for url: "+url)
+    return None
+
+  programs = []
+  for item in r.json():
     url = item["contentUrl"]
-    title = item["title"]
+    title = item["programTitle"]
     plot = item.get("description", "")
-    info = {"plot": plot}
     thumbnail = helper.prepareThumb(item.get("thumbnail", ""), BASE_URL)
+    if not thumbnail:
+      thumbnail = helper.prepareThumb(item.get("poster", ""), BASE_URL)
+    info = {"plot": plot, "thumbnail": thumbnail, "fanart": thumbnail}
     program = { "title": title, "url": url, "thumbnail": thumbnail, "info": info}
     programs.append(program)
   return programs
@@ -144,28 +116,40 @@ def getProgramsForGenre(genre):
 def getAlphas():
   """
   Returns a list of all letters in the alphabet that has programs.
+
+  Hard coded as the API can't return a list.
   """
-  html = getPage(URL_A_TO_O)
-  container = parseDOM(html, "ul", attrs = { "class" : "[^\"']*play_alphabetic-skiplinks[^\"']*" })
-
-  if not container:
-    helper.errorMsg("No container found!")
-    return None
-
-  letters = parseDOM(container[0], "a", attrs = { "class" : "[^\"']*play_alphabetic-skiplinks__link[^\"']*" })
-
-  if not letters:
-    helper.errorMsg("Could not find any letters!")
-    return None
-
   alphas = []
-
-  for letter in letters:
-    alpha = {}
-    alpha["title"] = common.replaceHTMLCodes(letter).encode("utf-8")
-    alpha["char"] =  letter.encode("utf-8")
-    alphas.append(alpha)
-
+  alphas.append("A")
+  alphas.append("B")
+  alphas.append("C")
+  alphas.append("D")
+  alphas.append("E")
+  alphas.append("F")
+  alphas.append("G")
+  alphas.append("H")
+  alphas.append("I")
+  alphas.append("J")
+  alphas.append("K")
+  alphas.append("L")
+  alphas.append("M")
+  alphas.append("N")
+  alphas.append("O")
+  alphas.append("P")
+  alphas.append("Q")
+  alphas.append("R")
+  alphas.append("S")
+  alphas.append("T")
+  alphas.append("U")
+  alphas.append("V")
+  alphas.append("W")
+  alphas.append("X")
+  alphas.append("Y")
+  alphas.append("Z")
+  alphas.append("Å")
+  alphas.append("Ä")
+  alphas.append("Ö")
+  alphas.append("0-9")
   return alphas
 
 def getProgramsByLetter(letter):
@@ -173,29 +157,27 @@ def getProgramsByLetter(letter):
   Returns a list of all program starting with the supplied letter.
   """
   letter = urllib.unquote(letter)
-  url = BASE_URL+API_URL+"programs_page"
+  url = BASE_URL+API_URL+"all_titles"
  
   r = requests.get(url)
   if r.status_code != 200:
     common.log("Did not get any response for: "+url)
     return None
 
-  contents = r.json()
+  letter = letter.decode("utf-8")
+  pattern = "[%s]" % letter.upper()
+
+  titles = r.json()
   items = []
   
   programs = []
-  try:
-    programs = contents["letters"][letter]
-  except KeyError:
-    common.log("Could not find letter \""+letter+"\"")
-    return None
-
-  for program in programs:
-    item = {}
-    item["url"] = "/"+program["urlFriendlyTitle"]
-    item["title"] = common.replaceHTMLCodes(program["title"])
-    item["thumbnail"] = helper.prepareThumb(program.get("thumbnail", ""), baseUrl=BASE_URL)
-    items.append(item)
+  for title in titles:
+    if re.search(pattern, title["programTitle"][0].upper()):
+      item = {}
+      item["url"] = "/" + title["contentUrl"]
+      item["title"] = common.replaceHTMLCodes(title["programTitle"])
+      item["thumbnail"] = ""
+      items.append(item)
 
   return items
 
@@ -214,29 +196,29 @@ def getSearchResults(search_term):
   items = []
   contents = r.json()
 
-  for program in contents["titles"]["videoItems"]:
+  for program in contents["titles"]:
     item = {}
     item["title"] = common.replaceHTMLCodes(program["title"])
     item["url"] = program["contentUrl"]
-    item["thumbnail"] = helper.prepareThumb(program.get("thumbnail", ""), baseUrl=BASE_URL)
+    item["thumbnail"] = helper.prepareThumb(program.get("imageMedium", ""), baseUrl=BASE_URL)
     item["info"] = {}
     item["info"]["plot"] = program.get("description", "")
     items.append({"item": item, "type" : "program"})
 
-  for video in contents["episodes"]["videoItems"]:
+  for video in contents["episodes"]:
     item = {}
     item["title"] = common.replaceHTMLCodes(video["title"])
     item["url"] = video["contentUrl"]
-    item["thumbnail"] = helper.prepareThumb(video.get("thumbnail", ""), baseUrl=BASE_URL)
+    item["thumbnail"] = helper.prepareThumb(video.get("imageMedium", ""), baseUrl=BASE_URL)
     item["info"] = {}
     item["info"]["plot"] = video.get("description", "")
     items.append({"item": item, "type": "video"})
 
-  for clip in contents["clips"]["videoItems"]:
+  for clip in contents["clips"]:
     item = {}
     item["title"] = common.replaceHTMLCodes(clip["title"])
     item["url"] = clip["contentUrl"]
-    item["thumbnail"] = helper.prepareThumb(clip.get("thumbnail", ""), baseUrl=BASE_URL)
+    item["thumbnail"] = helper.prepareThumb(clip.get("imageMedium", ""), baseUrl=BASE_URL)
     item["info"] = {}
     item["info"]["plot"] = clip.get("description", "")
     items.append({"item": item, "type": "video"})
@@ -290,6 +272,11 @@ def getEpisodes(title):
   for item in r.json()["relatedVideos"]["episodes"]:
     program = {}
     program["title"] = item["title"]
+    try:
+      program["title"] = program["title"] + "[COLOR green] (S%sE%s)[/COLOR]" % (str(item["season"]), str(item["episodeNumber"]))
+    except KeyError as e:
+      # Supress
+      pass
     program["url"] = "video/" + str(item["id"])
     program["thumbnail"] = helper.prepareThumb(item.get("thumbnail", ""), BASE_URL)
     info = {}
@@ -328,72 +315,6 @@ def getVideoJSON(video_url):
     return None
   return r.json()
 
-def getProgramItems(section_name, url=None):
-  """
-  Returns a list of program items for a show.
-  Program items have 'title', 'thumbnail', 'url' and 'info' keys.
-  """
-  if not url:
-    url = "/"
-  html = getPage(url + "?sida=2")
-
-  video_list_class = "[^\"']*play_videolist[^\"']*"
-
-  container = parseDOM(html, "div", attrs = { "id" : section_name })
-  if not container:
-    helper.errorMsg("No container found for section "+section_name+"!")
-    return None
-  container = container[0]
-
-  item_class = "[^\"']*play_vertical-list__item[^\"']*"
-  items = parseDOM(container, "li", attrs = { "class" : item_class })
-  if not items:
-    helper.errorMsg("No items found in container \""+section_name+"\"")
-    return None
-  new_articles = []
-
-
-  for index, item in enumerate(items):
-    live_item = False
-    if "play_live-countdown" in item:
-      live_item = True
-      helper.infoMsg("Skipping live item!")
-      continue
-    info = {}
-    new_article = {}
-    title = parseDOM(item, "a",
-                            attrs = { "class" : "[^\"']*play_vertical-list__header-link[^\"']*" })[0]
-    plot = parseDOM(item, "p",
-                            attrs = { "class" : "[^\"']*play_vertical-list__description-text[^\"']*" })[0]
-    new_article["url"] = parseDOM(item, "a",
-                            attrs = { "class": "[^\"']*play_vertical-list__header-link[^\"']*" },
-                            ret = "href")[0]
-    thumbnail = parseDOM(item,
-                                "img",
-                                attrs = { "class": "[^\"']*play_vertical-list__image[^\"']*" },
-                                ret = "src")[0]
-    new_article["thumbnail"] = helper.prepareThumb(thumbnail, baseUrl=BASE_URL)
-    duration = parseDOM(item, "time", attrs = {}, )[0]
-    aired = parseDOM(item, "p", attrs = { "class" : "[^\"']*play_vertical-list__meta-info[^\"']*" })
-    if aired:
-      aired = aired[0].replace("Publicerades ", "")
-    else:
-      # Some items do not contain this meta data
-      aired = ""
-
-    title = common.replaceHTMLCodes(title)
-    plot = common.replaceHTMLCodes(plot)
-    new_article["title"] = title
-    info["title"] = title
-    info["plot"] = plot
-    info["aired"] = helper.convertDate(aired) 
-    info["duration"] = helper.convertDuration(duration)
-    info["fanart"] = helper.prepareFanart(thumbnail, baseUrl=BASE_URL)
-    new_article["info"] = info
-    new_articles.append(new_article)
-
-  return new_articles
-
 def getItems(section_name, page):
   if not page:
     page = 1
@@ -430,10 +351,11 @@ def getItems(section_name, page):
     item["info"] = info
     returned_items.append(item)
 
-  return (returned_items, contents["hasNextPage"])
+  return (returned_items, contents["paginationData"]["totalPages"] > contents["paginationData"]["currentPage"])
 
 def getPage(url):
   """
   Wrapper, calls helper.getPage with SVT's base URL
   """
   return helper.getPage(BASE_URL + url)
+ 

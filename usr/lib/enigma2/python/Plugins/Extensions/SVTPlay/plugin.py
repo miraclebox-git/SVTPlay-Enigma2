@@ -452,18 +452,18 @@ class SVTPlayMainMenu(Screen):
 		self.clearList()
 		for category in categories:
 			self.categoriesUrl.append(str(category["url"]))
-			self.addDirectoryItem(str(category["title"]), { "mode": MODE_CATEGORY, "url": category["url"] }, thumbnail = str(category["thumbnail"]))
+			self.addDirectoryItem(str(category["title"]), { "mode": MODE_CATEGORY, "url": category["genre"]}, thumbnail = str(category["thumbnail"]))
 		# Hack for SelectionChanged
 		self.updateList()
 
-	def viewProgramsForCategories(self, url):
-		programs = svt.getProgramsForCategory(url)
+	def viewProgramsForCategories(self, genre):
+		programs = svt.getProgramsForGenre(genre)
 		if not programs:
 			return
 		
 		self.clearList()
 		for program in programs:
-			self.addDirectoryItem(str(program["title"]), { "mode" : MODE_PROGRAM, "url" : program["url"] }, thumbnail = str(program["thumbnail"]))
+			self.addDirectoryItem(str(program["title"]), { "mode" : MODE_PROGRAM, "url" : program["url"] }, thumbnail = str(program["thumbnail"]), str(info=program["info"]))
 		# Hack for SelectionChanged
 		self.updateList()
 
@@ -630,13 +630,10 @@ class SVTPlayMainMenu(Screen):
 		self.updateList()
     
 	def playVideo(self, url, title):
-		if not url.startswith("/"):
-			url = "/" + url
-
-		url = svt.BASE_URL + url + svt.JSON_SUFFIX
-
+		json = svt.getVideoJSON(url)
+		
 		try:
-			show_obj = helper.resolveShowURL(url)
+			show_obj = helper.resolveShowJSON(json)
 
 			if show_obj["videoUrl"]:
 				print "[SVTPlay] videoUrl : ", show_obj["videoUrl"].replace(":", "%3a")

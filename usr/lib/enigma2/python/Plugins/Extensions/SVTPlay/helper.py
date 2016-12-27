@@ -3,6 +3,7 @@ import datetime
 import json
 import re
 import urllib
+import urlparse
 
 import CommonFunctions as common
 
@@ -148,10 +149,10 @@ def elementExists(html, etype, attrs):
 
 
 def prepareImgUrl(url, baseUrl):
-  if url.startswith("//www.svt.se"):
+  if url.startswith("//"):
     url = url.lstrip("//")
     url = "http://" + url
-  elif not url.startswith("http://") and baseUrl:
+  elif not (url.startswith("http://") or url.startswith("https://")) and baseUrl:
     url = baseUrl + url
   return url
 
@@ -159,16 +160,20 @@ def prepareThumb(thumbUrl, baseUrl):
   """
   Returns a thumbnail with size THUMB_SIZE
   """
+  if not thumbUrl:
+    return ""
   thumbUrl = prepareImgUrl(thumbUrl, baseUrl)
-  thumbUrl = re.sub(r"small|medium|large|extralarge", THUMB_SIZE, thumbUrl)
+  thumbUrl = re.sub(r"\{format\}|small|medium|large|extralarge", THUMB_SIZE, thumbUrl)
   return thumbUrl
 
 def prepareFanart(fanartUrl, baseUrl):
   """
   Returns a fanart image URL.
   """
+  if not fanartUrl:
+    return ""
   fanartUrl = prepareImgUrl(fanartUrl, baseUrl)
-  fanartUrl = re.sub(r"small|medium|large|extralarge", "extralarge_imax", fanartUrl)
+  fanartUrl = re.sub(r"\{format\}|small|medium|large|extralarge", "extralarge_imax", fanartUrl)
   return fanartUrl
 
 
@@ -209,17 +214,17 @@ def mp4Handler(jsonObj):
   return url
 
 
-def hlsStrip(videoUrl):
+def hlsStrip(video_url):
     """
     Extracts the stream that supports the
     highest bandwidth and is not using the avc1.77.30 codec.
     """
-    common.log("Stripping file: " + videoUrl)
+    common.log("Stripping file: " + video_url)
 
-    ufile = urllib.urlopen(videoUrl)
+    ufile = urllib.urlopen(video_url)
     lines = ufile.readlines()
 
-    hlsurl = ""
+    hls_url = ""
     bandwidth = 0
     foundhigherquality = False
 
@@ -227,7 +232,7 @@ def hlsStrip(videoUrl):
       if foundhigherquality:
         # The stream url is on the line proceeding the header
         foundhigherquality = False
-        hlsurl = line
+        hls_url = line
       if "EXT-X-STREAM-INF" in line: # The header
         if not "avc1.77.30" in line:
           match = re.match(r'.*BANDWIDTH=(\d+).+', line)
@@ -241,9 +246,10 @@ def hlsStrip(videoUrl):
       return None
 
     ufile.close()
-    hlsurl = hlsurl.rstrip()
-    common.log("Returned stream url : " + hlsurl)
-    return hlsurl
+    hls_url = hls_url.rstrip()
+    return_url = urlparse.urljoin(video_url, hls_url)
+    common.log("Returned stream url : " + return_url)
+    return return_url
 
 
 def getStreamForBW(url):
@@ -257,14 +263,14 @@ def getStreamForBW(url):
   f = urllib.urlopen(url)
   lines = f.readlines()
 
-  hlsurl = ""
+  hls_url = ""
   marker = "#EXT-X-STREAM-INF"
   found = False
 
   for line in lines:
     if found:
       # The stream url is on the line proceeding the header
-      hlsurl = line
+      hls_url = line
       break
     if marker in line: # The header
       match = re.match(r'.*BANDWIDTH=(\d+)000.+', line)
@@ -276,13 +282,14 @@ def getStreamForBW(url):
   f.close()
 
   if found:
-    hlsurl = hlsurl.rstrip()
-    common.log("Returned stream url: " + hlsurl)
-    return (hlsurl, '')
+    hls_url = hls_url.rstrip()
+    return_url = urlparse.urljoin(url, hls_url)
+    common.log("Returned stream url: " + return_url)
+    return (return_url, '')
   else:
-    errormsg = "No stream found for bandwidth setting " + str(low_bandwidth)
-    common.log(errormsg)
-    return (None, errormsg)
+    error_msg = "No stream found for bandwidth setting " + str(low_bandwidth)
+    common.log(error_msg)
+    return (None, error_msg)
 
 
 def getHighBw(low):
@@ -319,17 +326,15 @@ def getSubtitleUrl(json_obj):
   Returns a subtitleURL from a SVT JSON object.
   """
   url = None
-
-  for subtitle in json_obj["video"]["subtitleReferences"]:
+  for subtitle in json_obj["video"]["subtitles"]:
     if subtitle["url"].endswith(".wsrt"):
       url = subtitle["url"]
     else:
       if len(subtitle["url"]) > 0:
         common.log("Skipping unknown subtitle: " + subtitle["url"])
-
   return url
 
-def resolveShowURL(show_url):
+def resolveShowJSON(json_obj):
   """
   Returns an object containing the video and subtitle URL for a show URL.
   Takes all settings into account.
@@ -337,7 +342,6 @@ def resolveShowURL(show_url):
   video_url = None
   subtitle_url = None
 
-  json_obj = getJSONObj(show_url)
   video_url = getVideoURL(json_obj)
   if video_url:
     subtitle_url = getSubtitleUrl(json_obj)
@@ -349,8 +353,33 @@ def resolveShowURL(show_url):
         video_url = hlsStrip(video_url)
       elif getSetting("bwselect"):
         (video_url, errormsg) = getStreamForBW(video_url)
-
+    video_url = cleanUrl(video_url)
   return {"videoUrl": video_url, "subtitleUrl": subtitle_url}
+
+def cleanUrl(video_url):
+  """
+  Returns a cleaned version of the URL.
+
+  Put all permanent and temporary cleaning rules here.
+  """
+  tmp = video_url.split("?")
+  newparas = []
+  if len(tmp) == 2:
+    # query parameters exists
+    newparas.append("?")
+    paras = tmp[1].split("&")
+    for para in paras:
+      if para.startswith("cc1"):
+        # Clean out subtitle parameters for iOS
+        # causing playback issues in xbmc.
+        pass
+      elif para.startswith("alt"):
+        # Web player specific parameter that
+        # Kodi doesn't need.
+        pass
+      else:
+        newparas.append(para)
+  return tmp[0]+"&".join(newparas).replace("?&", "?")
 
 def getVideoExtension(video_url):
   """
@@ -368,10 +397,11 @@ def getVideoExtension(video_url):
 
 
 def getSetting(setting):
-  return False
+  return True if addon.getSetting(setting) == "true" else False
 
 def errorMsg(msg):
   common.log("Error: "+msg)
 
 def infoMsg(msg):
   common.log("Info: "+msg)
+ 

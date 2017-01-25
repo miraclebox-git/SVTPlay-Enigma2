@@ -463,7 +463,7 @@ class SVTPlayMainMenu(Screen):
 		
 		self.clearList()
 		for program in programs:
-			self.addDirectoryItem(str(program["title"]), { "mode" : MODE_PROGRAM, "url" : program["url"] }, thumbnail = str(program["thumbnail"]), str(info=program["info"]))
+			self.addDirectoryItem(str(program["title"]), { "mode" : MODE_PROGRAM, "url" : program["url"] }, thumbnail = str(program["thumbnail"]), info=str(program["info"]))
 		# Hack for SelectionChanged
 		self.updateList()
 
